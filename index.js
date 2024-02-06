@@ -32,18 +32,21 @@ if(false){
 }
 
 class Context {
-    constructor(parent = null){
+    constructor(parent = null, name = null){
         if(parent instanceof Context)
             this.parent = parent
         else 
             this.name = parent
 
+        if(name)
+            this.name = name
+
         this.$ = {}
         this._ = []
     }
 
-    enter(){
-        return new Context(this)
+    enter(name){
+        return new Context(this, name)
     }
 
     exit(){
@@ -84,8 +87,8 @@ class Context {
 }
 
 class File {
-    constructor(project, filename){
-        this.$$ = this.project = project
+    constructor(context, filename){
+        this.$$ = this.context = context
         this.filename = filename
     }
 
@@ -222,7 +225,7 @@ class File {
     }
 
     async readAst_With(ast){
-        let $$ = this.$$ = this.$$.set('%AnnAssign')
+        let $$ = this.$$ = this.$$.enter('With')
 
         $$.items = []
         for(let item of ast.items){
@@ -277,7 +280,7 @@ class File {
     }
 
     async readAst_For(ast){
-        let $$ = this.$$ = this.$$.set('%For')
+        let $$ = this.$$ = this.$$.enter('For')
         $$.iter = await this.readAst(ast.iter)
         $$.type_comment = ast.type_comment
         $$.target = await this.readAstValue(ast.target)
@@ -340,7 +343,7 @@ class File {
     }
 
     async readAst_If(ast){
-        const $$ = this.$$ = this.$$.set('%'+ast.node_type)
+        const $$ = this.$$ = this.$$.enter(ast.node_type)
         $$.$common = 'If'
 
         $$.set('%test', ast.test)
@@ -365,11 +368,13 @@ class File {
     }
 
     async readAst_Call(ast){
-        let $$ = this.$$.set('%Call')
+        let $$ = this.$$ = this.$$.set('%Call')
 
         $$.args = ast.args
         $$.function = await this.readAstValue(ast.func)
         $$.tree = $$.function.getTree('Name')
+
+        this.$$ = $$.exit()
 
         return $$
     }   
@@ -409,7 +414,7 @@ class File {
         $$.$common = 'Import'
 
         for(let name of ast.names){
-            let asName = name.asname || name            
+            let asName = name.asname || name.name           
             this.$$.set(asName, {type: 'module', name: ast.module || name.name})
         }
         
@@ -418,7 +423,7 @@ class File {
     }
 
     async readAst_Try(ast){
-        const $$ = this.$$ = this.$$.enter()
+        const $$ = this.$$ = this.$$.enter('Try')
         
         await this.readAstBody(ast)
 
@@ -442,13 +447,16 @@ class File {
     }
 
     async readAst_Assign(ast){
+        let $$ = this.$$ = this.$$.set('%Return')
+
         for(let target of ast.targets){
-            this.$$ = this.$$.set(target.id)
+            this.$$ = $$.set(target.id)
             await this.readAst(ast.value, '%value')
-            this.$$ = this.$$.exit()
+            this.$$ = $$.exit()
         }
 
-        //todo: container $$
+        this.$$ = $$.exit()
+        return $$
     }
 
     ////
@@ -479,25 +487,28 @@ class File {
         if(!Array.isArray(body))
             body = [body]
 
-        let res = []
-
         for(let a of body){
-            res.push(await this.readAst(a))
-        }
+            let r = await this.readAst(a)
 
-        return res
+            if(!r)
+                console.log("debug: empty result")
+        }
     }
 
     async getAst(){
-        let ast = await getPythonAst(pythonFilePath);
-        let read = await this.readAstBody(ast)
-
-        console.log("read")
+        let ast = await getPythonAst(this.filename);
+        await this.readAstBody(ast)
     }
 }
 
-const project = new Context()
+async function main(){
+    const project = new Context()
 
-const pythonFilePath = "tests/stablediffusion/ldm/modules/attention.py"
-let file = new File(project, pythonFilePath)
-file.getAst()
+    const pythonFilePath = "tests/stablediffusion/ldm/modules/attention.py"
+    let file = new File(project, pythonFilePath)
+    await file.getAst()
+
+    console.log("read")
+}
+
+main()
