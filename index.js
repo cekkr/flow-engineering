@@ -33,7 +33,11 @@ if(false){
 
 class Context {
     constructor(parent = null){
-        this.parent = parent
+        if(parent instanceof Context)
+            this.parent = parent
+        else 
+            this.name = parent
+
         this.$ = {}
         this._ = []
     }
@@ -164,6 +168,12 @@ class File {
             case 'Delete':
                 return await this.readAst_Delete(ast)
 
+            case 'Assert':
+                return await this.readAst_Assert(ast)
+
+            case 'Raise':
+                return await this.readAst_Raise(ast)
+
             default:
                 console.warn("to be implemented")
         }
@@ -172,6 +182,18 @@ class File {
     ////
     ////
     ////
+
+    async readAst_Raise(ast){
+        let $ = new Context("Raise")
+        $.exc = ast.exc 
+        return $
+    }
+
+    async readAst_Assert(ast){
+        let $ = new Context("Assert")
+        $.test = await this.readAst(ast.test)
+        return $
+    }
 
     async readAst_Delete(ast){
         let $$ = this.$$ = this.$$.set('%Delete')
@@ -187,7 +209,7 @@ class File {
     }
 
     async readAst_Tuple(ast){
-        let $ = new Context()
+        let $ = new Context("Tuple")
 
         $.ctx = ast.ctx
 
@@ -223,7 +245,7 @@ class File {
     async readAst_AnnAssign(ast){
         let $$ = this.$$ = this.$$.set('%AnnAssign')
         $$.annotation = await this.readAst(ast.annotation)
-        $$.simple = simple 
+        $$.simple = ast.simple 
         $$.target = await this.readAstValue(ast.target)
         $$.value = await this.readAstValue(ast.value)
 
@@ -233,7 +255,7 @@ class File {
     }
 
     async readAst_List(ast){
-        let $ = new Context()
+        let $ = new Context("List")
 
         $.values = []
         for(let i=0; i<ast.elts.length; i++){
@@ -244,7 +266,7 @@ class File {
     }
 
     async readAst_Dict(ast){
-        let $ = new Context()
+        let $ = new Context("Dict")
         $.dict = {}
 
         for(let i=0; i<ast.keys.length; i++){
@@ -457,14 +479,20 @@ class File {
         if(!Array.isArray(body))
             body = [body]
 
+        let res = []
+
         for(let a of body){
-            await this.readAst(a)
+            res.push(await this.readAst(a))
         }
+
+        return res
     }
 
     async getAst(){
         let ast = await getPythonAst(pythonFilePath);
-        await this.readAstBody(ast)
+        let read = await this.readAstBody(ast)
+
+        console.log("read")
     }
 }
 
