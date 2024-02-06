@@ -146,6 +146,24 @@ class File {
             case 'For':
                 return await this.readAst_For(ast)
 
+            case 'Dict':
+                return await this.readAst_Dict(ast)
+
+            case 'List':
+                return await this.readAst_List(ast)
+
+            case 'AnnAssign':
+                return await this.readAst_AnnAssign(ast)
+
+            case 'With':
+                return await this.readAst_With(ast)   
+                
+            case 'Tuple':
+                return await this.readAst_Tuple(ast)
+
+            case 'Delete':
+                return await this.readAst_Delete(ast)
+
             default:
                 console.warn("to be implemented")
         }
@@ -155,9 +173,90 @@ class File {
     ////
     ////
 
+    async readAst_Delete(ast){
+        let $$ = this.$$ = this.$$.set('%Delete')
+
+        $$.targets = []
+        for(let i=0; i<ast.targets.length; i++){
+            $$.targets.push(await this.readAstValue(ast.targets[i]))
+        }
+
+        this.$$ = this.$$.exit()
+
+        return $$
+    }
+
+    async readAst_Tuple(ast){
+        let $ = new Context()
+
+        $.ctx = ast.ctx
+
+        $.values = []
+        for(let i=0; i<ast.elts.length; i++){
+            $.values[i] = await this.readAstValue(ast.elts[i])
+        }
+
+        return $
+    }
+
+    async readAst_With(ast){
+        let $$ = this.$$ = this.$$.set('%AnnAssign')
+
+        $$.items = []
+        for(let item of ast.items){
+            let resItem = {}
+
+            resItem.context_expr = await this.readAst(item.context_expr)
+
+            if(item.optional_vars)
+                resItem.optional_vars = await this.readAst(item.optional_vars)
+
+            $$.items.push(resItem)
+        }
+
+        this.readAstBody(ast.body)
+
+        this.$$ = $$.exit()
+        return $$
+    }
+
+    async readAst_AnnAssign(ast){
+        let $$ = this.$$ = this.$$.set('%AnnAssign')
+        $$.annotation = await this.readAst(ast.annotation)
+        $$.simple = simple 
+        $$.target = await this.readAstValue(ast.target)
+        $$.value = await this.readAstValue(ast.value)
+
+        this.$$ = $$.exit()
+
+        return $$
+    }
+
+    async readAst_List(ast){
+        let $ = new Context()
+
+        $.values = []
+        for(let i=0; i<ast.elts.length; i++){
+            $.values[i] = await this.readAstValue(ast.elts[i])
+        }
+
+        return $
+    }
+
+    async readAst_Dict(ast){
+        let $ = new Context()
+        $.dict = {}
+
+        for(let i=0; i<ast.keys.length; i++){
+            $.dict[ast.keys[i]] = await this.readAstValue(ast.values[i])
+        }
+
+        return $
+    }
+
     async readAst_For(ast){
         let $$ = this.$$ = this.$$.set('%For')
-        $$.iter = await this.readAst(iter)
+        $$.iter = await this.readAst(ast.iter)
         $$.type_comment = ast.type_comment
         $$.target = await this.readAstValue(ast.target)
 
@@ -168,6 +267,7 @@ class File {
         this.$$ = this.$$.exit()
 
         this.$$ = this.$$.exit()
+        return $$
     }
 
     async readAst_ClassDef(ast){
