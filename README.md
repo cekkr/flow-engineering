@@ -7,3 +7,6 @@ In this moment the NodeJS script is able to read a particular file, extract its 
 Is just a little achievement, but pretty cool to see.
 
 Riccardo
+
+## References
+[https://docs.python.org/3/library/ast.html](https://docs.python.org/3/library/ast.html)

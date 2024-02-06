@@ -92,6 +92,9 @@ class File {
         this.filename = filename
     }
 
+    /// https://docs.python.org/3/library/ast.html
+    /// Use this web page as reference about Python's AST
+
     async readAst(ast){
         if(!ast)
             console.error("debug empty readAst")
