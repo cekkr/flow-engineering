@@ -53,9 +53,11 @@ class Context {
         return this.parent
     }
 
-    set(name, value={}){
+    set(name, value={}, ast={}){
 
         value = {...value, ...{"%name": name}}
+        value.ast = ast
+
         this._.push(value)
 
         let $ = this.$[name]
@@ -202,7 +204,7 @@ class File {
     }
 
     async readAst_Delete(ast){
-        let $$ = this.$$ = this.$$.set('%Delete')
+        let $$ = this.$$ = this.$$.set('%Delete', {ast})
 
         $$.targets = []
         for(let i=0; i<ast.targets.length; i++){
@@ -228,7 +230,7 @@ class File {
     }
 
     async readAst_With(ast){
-        let $$ = this.$$ = this.$$.enter('With')
+        let $$ = this.$$ = this.$$.set('%With', {ast})
 
         $$.items = []
         for(let item of ast.items){
@@ -249,7 +251,7 @@ class File {
     }
 
     async readAst_AnnAssign(ast){
-        let $$ = this.$$ = this.$$.set('%AnnAssign')
+        let $$ = this.$$ = this.$$.set('%AnnAssign', {ast})
         $$.annotation = await this.readAst(ast.annotation)
         $$.simple = ast.simple 
         $$.target = await this.readAstValue(ast.target)
@@ -283,7 +285,7 @@ class File {
     }
 
     async readAst_For(ast){
-        let $$ = this.$$ = this.$$.enter('For')
+        let $$ = this.$$ = this.$$.enter('For', {ast})
         $$.iter = await this.readAst(ast.iter)
         $$.type_comment = ast.type_comment
         $$.target = await this.readAstValue(ast.target)
@@ -299,7 +301,7 @@ class File {
     }
 
     async readAst_ClassDef(ast){
-        let $$ = this.$$ = this.$$.set(ast.name)
+        let $$ = this.$$ = this.$$.set(ast.name, {ast})
         $$.bases = ast.bases 
         $$.decorator_list = ast.decorator_list 
         $$.keywords = ast.keywords
@@ -311,14 +313,14 @@ class File {
     }
 
     async readAst_Expr(ast){
-        let $$ = this.$$ = this.$$.set('%Expr')
+        let $$ = this.$$ = this.$$.set('%Expr', {ast})
         $$.value = await this.readAstValue(ast.value)
         this.$$ = this.$$.exit()
         return $$
     }
 
     async readAst_Subscript(ast){
-        let $$ = this.$$.set('%'+ast.node_type)
+        let $$ = this.$$.set('%'+ast.node_type, {ast})
 
         $$.slice = await this.readAst(ast.slice)
         $$.value = await this.readAstValue(ast.value)
@@ -327,7 +329,7 @@ class File {
     }
 
     async readAst_BinOp(ast){
-        let $$ = this.$$.set('%BinOp')
+        let $$ = this.$$.set('%BinOp', {ast})
 
         $$.left = await this.readAst(ast.left)
         $$.op = ast.node_type
@@ -337,7 +339,7 @@ class File {
     }
 
     async readAst_UnaryOp(ast){
-        let $$ = this.$$.set('%BinOp')
+        let $$ = this.$$.set('%UnaryOp', {ast})
 
         $$.op = ast.op.node_type 
         $$.operand = await this.readAst(ast.operand)
@@ -346,7 +348,7 @@ class File {
     }
 
     async readAst_If(ast){
-        const $$ = this.$$ = this.$$.enter(ast.node_type)
+        const $$ = this.$$ = this.$$.enter(ast.node_type, {ast})
         $$.$common = 'If'
 
         $$.set('%test', ast.test)
@@ -361,7 +363,7 @@ class File {
     }
 
     async readAst_Compare(ast){
-        let $$ = this.$$.set('%Compare')
+        let $$ = this.$$.set('%Compare', {ast})
 
         $$.left = {name: ast.id, ctx: ast.ctx, type: ast.node_type}
         $$.comparators = ast.comparators
@@ -371,7 +373,7 @@ class File {
     }
 
     async readAst_Call(ast){
-        let $$ = this.$$ = this.$$.set('%Call')
+        let $$ = this.$$ = this.$$.set('%Call', {ast})
 
         $$.args = ast.args
         $$.function = await this.readAstValue(ast.func)
@@ -383,37 +385,37 @@ class File {
     }   
     
     async readAst_Name(ast){
-        return this.$$.set(ast.id , {type: ast.node_type, ctxType: ast.ctx.node_type})
+        return this.$$.set(ast.id , {type: ast.node_type, ctxType: ast.ctx.node_type}, ast)
     }
 
     async readAst_Attribute(ast){
-        return this.$$.set(ast.attr, {type: ast.node_type, ctx: ast.ctx})
+        return this.$$.set(ast.attr, {type: ast.node_type, ctx: ast.ctx}, ast)
     }
 
     async readAst_DictComp(ast){
-        return this.$$.set(ast.node_type+'_'+this.$$.ns(), {...ast})
+        return this.$$.set(ast.node_type+'_'+this.$$.ns(), {...ast}, ast)
     }
 
     async readAst_Constant(ast, name=null){
-        return this.$$.set(name || '%Constant', {value: ast.value, type: 'Constant'})
+        return this.$$.set(name || '%Constant', {value: ast.value, type: 'Constant'}, ast)
     }
 
     async readAst_Return(ast){
-        const $$ = this.$$ = this.$$.set('%Return')
+        const $$ = this.$$ = this.$$.set('%Return', {ast})
         await this.readAst(ast.value, '%value')
         this.$$ = this.$$.exit()
         return $$
     }
 
     async readAst_FunctionDef(ast){
-        const $$ = this.$$ = this.$$.set(ast.name, {args: ast.args.args})
+        const $$ = this.$$ = this.$$.set(ast.name, {args: ast.args.args}, ast)
         await this.readAstBody(ast.body)
         this.$$ = this.$$.exit()
         return $$
     }
 
     async readAst_Import(ast){
-        const $$ = this.$$ = this.$$.set('%'+ast.node_type)
+        const $$ = this.$$ = this.$$.set('%'+ast.node_type, {ast})
         $$.$common = 'Import'
 
         for(let name of ast.names){
@@ -426,7 +428,7 @@ class File {
     }
 
     async readAst_Try(ast){
-        const $$ = this.$$ = this.$$.enter('Try')
+        const $$ = this.$$ = this.$$.enter('Try', {ast})
         
         await this.readAstBody(ast)
 
@@ -450,7 +452,7 @@ class File {
     }
 
     async readAst_Assign(ast){
-        let $$ = this.$$ = this.$$.set('%Return')
+        let $$ = this.$$ = this.$$.set('%Return', {ast})
 
         for(let target of ast.targets){
             this.$$ = $$.set(target.id)
@@ -510,6 +512,10 @@ async function main(){
     const pythonFilePath = "tests/stablediffusion/ldm/modules/attention.py"
     let file = new File(project, pythonFilePath)
     await file.getAst()
+
+    let $$ = file.$$ 
+    while($$.parent)
+        $$ = $$.parent
 
     console.log("read")
 }
